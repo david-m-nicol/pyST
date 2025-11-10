@@ -1,0 +1,182 @@
+[
+  {
+    "name": "sys_state",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.0",
+    "pos": 0,
+    "value": "True",
+    "mb_idx": 0
+  },
+  {
+    "name": "floor_req[0]",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.1",
+    "pos": 1,
+    "value": "True",
+    "mb_idx": 1
+  },
+  {
+    "name": "floor_req[1]",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.2",
+    "pos": 2,
+    "value": "True",
+    "mb_idx": 2
+  },
+  {
+    "name": "floor_req[2]",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.3",
+    "pos": 3,
+    "value": "True",
+    "mb_idx": 3
+  },
+  {
+    "name": "floor_req[3]",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.4",
+    "pos": 4,
+    "value": "True",
+    "mb_idx": 4
+  },
+  {
+    "name": "door_closed",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.5",
+    "pos": 5,
+    "value": "True",
+    "mb_idx": 5
+  },
+  {
+    "name": "moving_up",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.6",
+    "pos": 6,
+    "value": "False",
+    "mb_idx": 6
+  },
+  {
+    "name": "moving_down",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "IX0.7",
+    "pos": 7,
+    "value": "False",
+    "mb_idx": 7
+  },
+  {
+    "name": "sys_on",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "QX0.0",
+    "pos": 0,
+    "value": "True",
+    "mb_idx": 0
+  },
+  {
+    "name": "open_cmd",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "QX0.1",
+    "pos": 1,
+    "value": "False",
+    "mb_idx": 1
+  },
+  {
+    "name": "close_cmd",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "QX0.2",
+    "pos": 2,
+    "value": "False",
+    "mb_idx": 2
+  },
+  {
+    "name": "move_up_cmd",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "QX0.3",
+    "pos": 3,
+    "value": "False",
+    "mb_idx": 3
+  },
+  {
+    "name": "move_down_cmd",
+    "var_type": "BOOL",
+    "py_type": "bool",
+    "mem_code": "QX0.4",
+    "pos": 4,
+    "value": "False",
+    "mb_idx": 4
+  },
+  {
+    "name": "floor_level",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "IW0",
+    "pos": 0,
+    "value": 0,
+    "mb_idx": 0
+  },
+  {
+    "name": "logic_state",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW0",
+    "pos": 0,
+    "value": 0,
+    "mb_idx": 0
+  },
+  {
+    "name": "target_flr",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW1",
+    "pos": 1,
+    "value": 0,
+    "mb_idx": 1
+  },
+  {
+    "name": "target_level",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW2",
+    "pos": 2,
+    "value": 0,
+    "mb_idx": 2
+  },
+  {
+    "name": "selections",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW3",
+    "pos": 3,
+    "value": 0,
+    "mb_idx": 3
+  },
+  {
+    "name": "current_flr",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW4",
+    "pos": 4,
+    "value": 0,
+    "mb_idx": 4
+  },
+  {
+    "name": "count_down",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW5",
+    "pos": 5,
+    "value": 0,
+    "mb_idx": 5
+  }
+]
