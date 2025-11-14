@@ -8,7 +8,7 @@ class IMPORT_FROM_MB():
         self.VALUE = None
 
     # when the function block is executed the 'call' method is used
-    def call(self, TABLE='COIL', IDX=4):
+    def call(self, TABLE='COIL', LEN=1, IDX=4):
 
         # TABLE is a string included by the ST programmer that identifies the Modbus
         # data table to import the value from
@@ -27,9 +27,12 @@ class IMPORT_FROM_MB():
 
         # the file mbd.py has the code and global data structures through which
         # we interact with Modbus
-        OK, values = mbd.getTableValues(input_blk, IDX, 1)
+        OK, values = mbd.getTableValues(input_blk, IDX, LEN)
         if OK:
-            self.VALUE = values[0] 
+            if LEN==1:
+                self.VALUE = values[0] 
+            else:
+                self.VALUE = values
         else:
             print(f"Error importing from Modbus table {TABLE}") 
 
@@ -41,7 +44,7 @@ class EXPORT_TO_MB():
     def __init__(self):
         self.value = None
 
-    def call(self, VALUE=None, TABLE='COIL', IDX=4):
+    def call(self, VALUE=None, TABLE='COIL', START=0, LEN=1, IDX=4):
         match TABLE:
             case 'COIL':
                 input_blk = mbd.coilblock
@@ -55,7 +58,10 @@ class EXPORT_TO_MB():
                 print(f"unrecognized Modbus table {TABLE}")
                 return
 
-        OK = mbd.setTableValues(input_blk, IDX, [VALUE])
+        if LEN==1:
+            OK = mbd.setTableValues(input_blk, IDX, [VALUE])
+        else:
+            OK = mbd.setTableValues(input_blk, IDX, VALUE[START:START+LEN])
         if not OK:
             print(f"problem exporting value {VALUE} to Modbus table {TABLE}")
 

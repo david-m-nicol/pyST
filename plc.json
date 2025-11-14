@@ -135,7 +135,7 @@
     "mb_idx": 0
   },
   {
-    "name": "target_flr",
+    "name": "target_flr_code",
     "var_type": "INT",
     "py_type": "int",
     "mem_code": "MW1",
@@ -144,7 +144,7 @@
     "mb_idx": 1
   },
   {
-    "name": "target_level",
+    "name": "obs_target_flr_code",
     "var_type": "INT",
     "py_type": "int",
     "mem_code": "MW2",
@@ -153,7 +153,7 @@
     "mb_idx": 2
   },
   {
-    "name": "selections",
+    "name": "target_flr",
     "var_type": "INT",
     "py_type": "int",
     "mem_code": "MW3",
@@ -162,7 +162,7 @@
     "mb_idx": 3
   },
   {
-    "name": "current_flr",
+    "name": "target_level",
     "var_type": "INT",
     "py_type": "int",
     "mem_code": "MW4",
@@ -171,12 +171,30 @@
     "mb_idx": 4
   },
   {
-    "name": "count_down",
+    "name": "current_flr",
     "var_type": "INT",
     "py_type": "int",
     "mem_code": "MW5",
     "pos": 5,
     "value": 0,
     "mb_idx": 5
+  },
+  {
+    "name": "count_down",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW6",
+    "pos": 6,
+    "value": 0,
+    "mb_idx": 6
+  },
+  {
+    "name": "ms_per_cycle",
+    "var_type": "INT",
+    "py_type": "int",
+    "mem_code": "MW7",
+    "pos": 7,
+    "value": 100,
+    "mb_idx": 7
   }
 ]

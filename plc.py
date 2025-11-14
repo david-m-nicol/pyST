@@ -18,7 +18,7 @@ class IMPORT_FROM_MB():
         self.VALUE = None
 
     # when the function block is executed the 'call' method is used
-    def call(self, TABLE='COIL', IDX=4):
+    def call(self, TABLE='COIL', LEN=1, IDX=4):
 
         # TABLE is a string included by the ST programmer that identifies the Modbus
         # data table to import the value from
@@ -36,9 +36,12 @@ class IMPORT_FROM_MB():
                 return
         # the file mbd.py has the code and global data structures through which
         # we interact with Modbus
-        OK, values = mbd.getTableValues(input_blk, IDX, 1)
+        OK, values = mbd.getTableValues(input_blk, IDX, LEN)
         if OK:
-            self.VALUE = values[0] 
+            if LEN==1:
+                self.VALUE = values[0] 
+            else:
+                self.VALUE = values
         else:
             print(f"Error importing from Modbus table {TABLE}") 
 # EXPORT_TO_MB pushes the offered value out to the Modbus data table that is named,
@@ -47,7 +50,7 @@ class IMPORT_FROM_MB():
 class EXPORT_TO_MB():
     def __init__(self):
         self.value = None
-    def call(self, VALUE=None, TABLE='COIL', IDX=4):
+    def call(self, VALUE=None, TABLE='COIL', START=0, LEN=1, IDX=4):
         match TABLE:
             case 'COIL':
                 input_blk = mbd.coilblock
@@ -60,7 +63,10 @@ class EXPORT_TO_MB():
             case _:
                 print(f"unrecognized Modbus table {TABLE}")
                 return
-        OK = mbd.setTableValues(input_blk, IDX, [VALUE])
+        if LEN==1:
+            OK = mbd.setTableValues(input_blk, IDX, [VALUE])
+        else:
+            OK = mbd.setTableValues(input_blk, IDX, VALUE[START:START+LEN])
         if not OK:
             print(f"problem exporting value {VALUE} to Modbus table {TABLE}")
 # pyST.py creates a json string that is converted to a dictionary
@@ -438,39 +444,41 @@ close_cmd = False
 move_up_cmd = False
 move_down_cmd = False
 logic_state = 0
+target_flr_code = 0
+obs_target_flr_code = 0
 target_flr = 0
 target_level = 0
-selections = 0
 current_flr = 0
 count_down = 0
+ms_per_cycle = 100
 mb_import = IMPORT_FROM_MB()
 mb_export = EXPORT_TO_MB()
-loc_map_str = '[{"name": "sys_state", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.0", "pos": 0, "value": "True", "mb_idx": 0}, {"name": "floor_req[0]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.1", "pos": 1, "value": "True", "mb_idx": 1}, {"name": "floor_req[1]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.2", "pos": 2, "value": "True", "mb_idx": 2}, {"name": "floor_req[2]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.3", "pos": 3, "value": "True", "mb_idx": 3}, {"name": "floor_req[3]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.4", "pos": 4, "value": "True", "mb_idx": 4}, {"name": "door_closed", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.5", "pos": 5, "value": "True", "mb_idx": 5}, {"name": "moving_up", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.6", "pos": 6, "value": "False", "mb_idx": 6}, {"name": "moving_down", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.7", "pos": 7, "value": "False", "mb_idx": 7}, {"name": "sys_on", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.0", "pos": 0, "value": "True", "mb_idx": 0}, {"name": "open_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.1", "pos": 1, "value": "False", "mb_idx": 1}, {"name": "close_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.2", "pos": 2, "value": "False", "mb_idx": 2}, {"name": "move_up_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.3", "pos": 3, "value": "False", "mb_idx": 3}, {"name": "move_down_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.4", "pos": 4, "value": "False", "mb_idx": 4}, {"name": "floor_level", "var_type": "INT", "py_type": "int", "mem_code": "IW0", "pos": 0, "value": 0, "mb_idx": 0}, {"name": "logic_state", "var_type": "INT", "py_type": "int", "mem_code": "MW0", "pos": 0, "value": 0, "mb_idx": 0}, {"name": "target_flr", "var_type": "INT", "py_type": "int", "mem_code": "MW1", "pos": 1, "value": 0, "mb_idx": 1}, {"name": "target_level", "var_type": "INT", "py_type": "int", "mem_code": "MW2", "pos": 2, "value": 0, "mb_idx": 2}, {"name": "selections", "var_type": "INT", "py_type": "int", "mem_code": "MW3", "pos": 3, "value": 0, "mb_idx": 3}, {"name": "current_flr", "var_type": "INT", "py_type": "int", "mem_code": "MW4", "pos": 4, "value": 0, "mb_idx": 4}, {"name": "count_down", "var_type": "INT", "py_type": "int", "mem_code": "MW5", "pos": 5, "value": 0, "mb_idx": 5}]'
+loc_map_str = '[{"name": "sys_state", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.0", "pos": 0, "value": "True", "mb_idx": 0}, {"name": "floor_req[0]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.1", "pos": 1, "value": "True", "mb_idx": 1}, {"name": "floor_req[1]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.2", "pos": 2, "value": "True", "mb_idx": 2}, {"name": "floor_req[2]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.3", "pos": 3, "value": "True", "mb_idx": 3}, {"name": "floor_req[3]", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.4", "pos": 4, "value": "True", "mb_idx": 4}, {"name": "door_closed", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.5", "pos": 5, "value": "True", "mb_idx": 5}, {"name": "moving_up", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.6", "pos": 6, "value": "False", "mb_idx": 6}, {"name": "moving_down", "var_type": "BOOL", "py_type": "bool", "mem_code": "IX0.7", "pos": 7, "value": "False", "mb_idx": 7}, {"name": "sys_on", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.0", "pos": 0, "value": "True", "mb_idx": 0}, {"name": "open_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.1", "pos": 1, "value": "False", "mb_idx": 1}, {"name": "close_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.2", "pos": 2, "value": "False", "mb_idx": 2}, {"name": "move_up_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.3", "pos": 3, "value": "False", "mb_idx": 3}, {"name": "move_down_cmd", "var_type": "BOOL", "py_type": "bool", "mem_code": "QX0.4", "pos": 4, "value": "False", "mb_idx": 4}, {"name": "floor_level", "var_type": "INT", "py_type": "int", "mem_code": "IW0", "pos": 0, "value": 0, "mb_idx": 0}, {"name": "logic_state", "var_type": "INT", "py_type": "int", "mem_code": "MW0", "pos": 0, "value": 0, "mb_idx": 0}, {"name": "target_flr_code", "var_type": "INT", "py_type": "int", "mem_code": "MW1", "pos": 1, "value": 0, "mb_idx": 1}, {"name": "obs_target_flr_code", "var_type": "INT", "py_type": "int", "mem_code": "MW2", "pos": 2, "value": 0, "mb_idx": 2}, {"name": "target_flr", "var_type": "INT", "py_type": "int", "mem_code": "MW3", "pos": 3, "value": 0, "mb_idx": 3}, {"name": "target_level", "var_type": "INT", "py_type": "int", "mem_code": "MW4", "pos": 4, "value": 0, "mb_idx": 4}, {"name": "current_flr", "var_type": "INT", "py_type": "int", "mem_code": "MW5", "pos": 5, "value": 0, "mb_idx": 5}, {"name": "count_down", "var_type": "INT", "py_type": "int", "mem_code": "MW6", "pos": 6, "value": 0, "mb_idx": 6}, {"name": "ms_per_cycle", "var_type": "INT", "py_type": "int", "mem_code": "MW7", "pos": 7, "value": 100, "mb_idx": 7}]'
 loc_map = json.loads(loc_map_str)
 def plc_thread_function(spc):
     global sys_state,floor_req,door_closed,moving_up,moving_down
     global floor_level,sys_on,open_cmd,close_cmd,move_up_cmd
-    global move_down_cmd,logic_state,target_flr,target_level,selections
-    global current_flr,count_down,mb_import,mb_export
+    global move_down_cmd,logic_state,target_flr_code,obs_target_flr_code,target_flr
+    global target_level,current_flr,count_down,ms_per_cycle,mb_import
+    global mb_export
     build_loc_map(loc_map)
     while True:
         time.sleep(spc/1000)
         top_of_cycle_import()
-        mb_import.call(TABLE="COIL", IDX=0)
+        # is the system 'on'
+        mb_import.call(TABLE="COIL", IDX=0, LEN=1)
         sys_on = mb_import.VALUE
+        # the target_flr_code is non-zero when the controller has selected
+        # a floor and written its identity (plus 1) into the target_flr_code variable
+        #
+        mb_import.call(TABLE="HOLDING_REG", IDX=0, LEN=1)
+        obs_target_flr_code = mb_import.VALUE
+        if obs_target_flr_code != target_flr_code :
+            target_flr_code = obs_target_flr_code
         match  logic_state:
             case 0:
-                target_flr = -1
-                if current_flr < 3 :
-                    for IDX in range(current_flr+1, (3)+1):
-                        if floor_req[IDX] == True :
-                            target_flr = IDX
-                            break
-                if target_flr == -1 and current_flr > 0 :
-                    for IDX in range(0, (current_flr-1)+1):
-                        if floor_req[IDX] == True :
-                            target_flr = IDX
-                if target_flr != -1 :
+                if target_flr_code > 0 :
+                    target_flr = target_flr_code-1
                     if target_flr < current_flr :
                         target_level = 4*target_flr + 1
                         move_down_cmd = True
@@ -479,6 +487,7 @@ def plc_thread_function(spc):
                         target_level = 4*target_flr -1
                         move_up_cmd = True
                         move_down_cmd = False
+                    target_flr_code = 0
                     logic_state = 1
             case 1:
                 if move_up_cmd == True and moving_up == True :
@@ -511,9 +520,18 @@ def plc_thread_function(spc):
                 if door_closed == True :
                     logic_state = 0
                     close_cmd = False
+        # report whether on or off
         mb_export.call(TABLE="DATA", IDX=0, VALUE = sys_state)
-        mb_export.call(TABLE="DATA", IDX=1, VALUE = moving_up or moving_down)
-        mb_export.call(TABLE="INPUT_REG", IDX=0, VALUE = logic_state)
-        mb_export.call(TABLE="INPUT_REG", IDX=1, VALUE = floor_level)
-        mb_export.call(TABLE="INPUT_REG", IDX=2, VALUE = target_level)
+        # report whether door is closed
+        mb_export.call(TABLE="DATA", IDX=1, VALUE = door_closed)
+        # report whether in motion
+        mb_export.call(TABLE="DATA", IDX=2, VALUE = moving_up or moving_down)
+        # if the elevator is not moving, the floor is where the elevator car rests
+        mb_export.call(TABLE="INPUT_REG", IDX=0, VALUE = current_flr)
+        # if the elevator is not moving, the count_down is the number of milliseconds until the door closes
+        mb_export.call(TABLE="INPUT_REG", IDX=1, VALUE = count_down*ms_per_cycle)
+        # export the table of floor requests
+        mb_export.call(TABLE="INPUT_REG", IDX=2, VALUE = floor_req, START=0, LEN=4)
+        # export the communicated target floor code so that client knows it has been received
+        mb_export.call(TABLE="HOLDING_REG", IDX=0, VALUE = obs_target_flr_code)
         bottom_of_cycle_export()

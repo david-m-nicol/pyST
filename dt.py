@@ -33,8 +33,8 @@ move_down_cmd_idx = 4
 coil_end = move_down_cmd_idx+1
 
 # indices for holding registers table (MW)
-hr_ticks_per_flr_idx  = 1
-hr_msec_per_tick_idx = 2
+hr_ticks_per_flr_idx  = 0
+hr_msec_per_tick_idx = 1
 hr_end = hr_msec_per_tick_idx+1
 
 discrete_input = [False]*di_end
@@ -80,9 +80,7 @@ def dt_thread_function(msec_per_tick, rseed):
     random.seed(rseed)
 
     # start the simulation with an initial door ask
-    new_flr = flr
-    while new_flr == flr:
-        new_flr = random.randint(0,3)  
+    new_flr = random.randint(1,3)  
 
     discrete_input[ F0_req_idx + new_flr ] = True 
 
@@ -91,11 +89,14 @@ def dt_thread_function(msec_per_tick, rseed):
         # wait this long, and then do stuff
         time.sleep(msec_per_tick/1000)
         open_door_evt = False
+        #print(f"top of loop door requests {discrete_input[F0_req_idx:F0_req_idx+4]}")
 
         # advance position by ts_per_tick
         old_position = position
         if (discrete_input[moving_up_idx] or discrete_input[moving_down_idx]):
             position += (1 if up_direction else -1)
+
+        flr = int(position/4)
 
         # read in the command coils
         OK, coil = read_QX(0, coil_end-1)
@@ -107,7 +108,7 @@ def dt_thread_function(msec_per_tick, rseed):
         if not OK:
             print("Problem reading coil inputs")
             continue
- 
+
         # if the system is on, compute new state 
         if coil[0]:
 
@@ -119,12 +120,12 @@ def dt_thread_function(msec_per_tick, rseed):
 
             if not coil[ move_up_cmd_idx ] and not coil[ move_down_cmd_idx ]:
                 if changed_sig and old_position != position:
-                    print(f"power stopped at position {position}")
+                    print(f"power stopped at floor {flr}")
 
             # close the door if so directed and the door is not already closed
             if coil[ close_cmd_idx ] and not discrete_input[ door_closed_idx ]:
                 if changed_sig:
-                    print(f"door closes at position {position}")
+                    print(f"door closes at floor {flr}")
                 doorClosed = True
                 discrete_input[ door_closed_idx ] = True
 
@@ -134,30 +135,31 @@ def dt_thread_function(msec_per_tick, rseed):
                 doorClosed = False
                 discrete_input[ door_closed_idx ] = False
 
-                if changed_sig:
-                    print(f"door opens at position {position}")
-
                 # remember that the door transitioned from closed to open at this step
                 open_door_evt = True
 
-                # clear request in car if present 
-                flr = int(input_reg[ ir_pos_idx ]/4)
-                discrete_input[ F0_req_idx + flr ] = False
+                if changed_sig:
+                    print(f"door opens at floor {flr}")
 
             # check whether motion is started
-            if coil[ move_up_cmd_idx ]:
-                discrete_input[ moving_up_idx ] = True
-                up_direction = True
+            if coil[ move_up_cmd_idx] or coil[ move_down_cmd_idx ]:
+                # clear the requests, movement indicates recognition.  
+                for idx in range(0, 4):
+                    discrete_input[ F0_req_idx + idx ] = False
 
-                if changed_sig:
-                    print(f"start moving up from position {position}")
+                if coil[ move_up_cmd_idx ]:
+                    discrete_input[ moving_up_idx ] = True
+                    up_direction = True
 
-            elif coil[ move_down_cmd_idx ]:
-                discrete_input[ moving_down_idx ] = True
-                up_direction = False
+                    if changed_sig:
+                        print(f"start moving up from floor {flr}")
 
-                if changed_sig:
-                    print(f"start moving down from position {position}")
+                elif coil[ move_down_cmd_idx ]:
+                    discrete_input[ moving_down_idx ] = True
+                    up_direction = False
+
+                    if changed_sig:
+                        print(f"start moving down from floor {flr}")
 
             # batch all the writes here at the end of the cycle so that 
             # the actions during the cycle are completely driven by 
@@ -171,12 +173,12 @@ def dt_thread_function(msec_per_tick, rseed):
             # if the door just opened, randomly choose another floor to visit which is not the one
             # we're presently at
             if open_door_evt:
+                
                 new_flr = flr
                 while new_flr == flr:
                     new_flr = random.randint(0,3)  
 
                 discrete_input[ F0_req_idx + new_flr ] = True 
-                print(f"door requests {discrete_input[F0_req_idx:F0_req_idx+4]}")
 
             # report the discrete input states
             write_IX(0, di_end-1, discrete_input)
