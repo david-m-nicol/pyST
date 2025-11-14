@@ -9,15 +9,18 @@ import mbaux
 import struct
 import socket
 import threading
-import argparse
-import plc
-import dt
-import mbd
 import time
 
 from pymodbus.datastore import (
     ModbusSequentialDataBlock,
 )
+
+# Modbus data block table variables
+
+coilblock = None     
+datablock = None     
+inputRegblock = None
+holdingRegblock = None
 
 readDiscreteInputs   = 0x02
 writeDiscreteInputs  = 0x62
@@ -38,115 +41,64 @@ writeHoldingRegisters = 0x10
 maskWriteRegister = 0x16
 readWriteRegisters = 0x17
 
-dt_port = None
-dt_host = '127.0.0.1'
-
-# default milliseconds per dt clock tick
-mpt = 5000
-
-# default milliseconds per plc cycle
-mpc = 100
-
 client_port = None
 server_host = '127.0.0.1'
+srvr_sock = None
 
 tablesize = 100
-
 transactionID = 1
-rseed = 123455
 
-def getArgs():
-    global client_port, dt_port, server_host, dt_host, tablesize, mpt, mpc, rseed
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(u'-shost', metavar = u'server host', 
-                        dest=u'server_host', required=False)
-
-    parser.add_argument(u'-cport', metavar = u'modbus client port ', 
-                        dest=u'client_port', required=True)
-
-    parser.add_argument(u'-tablesize', metavar = u'length of PyModbus data tables', 
-                        dest=u'tablesize', required=False)
-
-    parser.add_argument(u'-mpc', metavar = u'milliseconds per cycle', 
-                        dest=u'mpc', required=False)
-
-    parser.add_argument(u'-seed', metavar = u'random seed', 
-                        dest=u'rseed', required=False)
-
-    # check whether what we want to do is read from a configuration file
-    cmdline = []
-    if sys.argv[1] == '-is':
-        with open(sys.argv[2], 'r') as rf:
-            for line in rf:
-                line = line.strip()
-                if len(line) == 0 or line.startswith('#'):
-                    continue
-                cmdline.extend(line.split())
-    else:
-        cmdline = sys.argv[1:]
-
-    args = parser.parse_args(cmdline)
-
-    if not args.client_port.isdigit():
-        print("server port number must be integer")
-        exit(1)
-
-    client_port = int(args.client_port)
-    if not 1024 <= client_port <= 49151:
-        print("client port number should be in [1024, 49151]")
-        exit(1)
-
-    if args.server_host is not None:
-        server_host = args.server_host
-    else:
-        server_host = '127.0.0.1'
-
-    if args.tablesize is not None:
-        try:
-            try_tablesize = int(args.tablesize)
-            if not 1 <= try_tablesize <= 65355:
-                print(f"block size [{try_tablesize}] should be an integer in [1, 65355], using default {tablesize}")
-            else:
-                tablesize = try_tablesize
-        except:
-                print(f"block size [{try_tablesize}] should be an integer in [1, 65355], using default {tablesize}")
-
-    if args.mpc is not None:
-        try:
-            mpc = int(args.mpc)
-            if mpc < 0:
-                print(f"milliseconds per cycle needs to be non-negative")
-                exit(1)
-        except:
-            print(f"milliseconds per cycle needs to be non-negative")
-            exit(1)
-
-    mpt = 5*mpc    
-
-    if args.rseed is not None:
-        rseed = int(args.rseed)
-
-        
+# given the data table, an address in that table, and a number of elements,
+# acquire those values from the data table and return them, doing a conversion
+# for tables holding booleans
+#
 def getTableValues(table, adrs, size):
     try:
         values = table.getValues(adrs, size)
-        return True, values
+        trns_values = []
+        # is the table of interest representing boolean variables?
+        if table==coilblock or table==datablock:
+            # yes, so create explicit conversions
+            for v in values:
+                if isinstance(v,int):
+                    vt = True if v%2 > 0 else False
+                    trns_values.append(vt)
+        else:
+            trns_values = values
+        return True, trns_values
+
     except:
         return False, []
 
+# given the data table, an address in that table, and a list of values,
+# write those values to the data table, doing a conversion
+# for tables holding booleans
+#
 def setTableValues(table, adrs, values):
     try:
-        table.setValues(adrs, values)
+        trns_values = []
+        # does this table manage Booleans?
+        if table == coilblock or table==datablock:
+            # yes, so do a conversion to integers 
+            for v in values:
+                if isinstance(v,bool):
+                    vt = 1 if v else 0
+                    trns_values.append(vt) 
+        else:
+            trns_values = values
+
+        table.setValues(adrs, trns_values)
         return True
     except:
         return False
 
+
+
+
 unsupportedFuncs = (0x7, 0x8, 0xB, 0xC, 0x11, 0x14, 0x15, 0x18, 0x2B)
 
 
-def srvr_thread_function(sock, extended):
+def srvr_thread_function(sock, extended=False):
     # look for a connection and when found spin off a thread to deal with it 
     sock.listen()
     while True:
@@ -202,9 +154,9 @@ def handle_request(conn, extended):
                     else:
                         # get the bit values
                         if fc==readCoils:
-                            OK, bits = getTableValues(mbd.coilblock, adrs, numBits)
+                            OK, bits = getTableValues(coilblock, adrs, numBits)
                         else:
-                            OK, bits = getTableValues(mbd.datablock, adrs, numBits)
+                            OK, bits = getTableValues(datablock, adrs, numBits)
                         if not OK:
                             pdu = struct.pack('>BB', 0x80+fc, 2)
                         else:
@@ -226,9 +178,9 @@ def handle_request(conn, extended):
                         pdu = struct.pack('>BB', 0x80+fc, 2)
                     else:
                         if fc==writeCoils:
-                            OK = setTableValues(mbd.coilblock, adrs, bitVec)
+                            OK = setTableValues(coilblock, adrs, bitVec)
                         else:
-                            OK = setTableValues(mbd.datablock, adrs, bitVec)
+                            OK = setTableValues(datablock, adrs, bitVec)
 
                         if not OK:
                             pdu = struct.pack('>BB', 0x80+fc, 4)
@@ -243,9 +195,9 @@ def handle_request(conn, extended):
                     else:
                         bit = True if value != 0 else False
                         if fc==writeCoil:
-                            setTableValues(mbd.coilblock, adrs, [bit])
+                            setTableValues(coilblock, adrs, [bit])
                         else:
-                            setTableValues(mbd.datablock, adrs, [bit])
+                            setTableValues(datablock, adrs, [bit])
 
                         pdu = struct.pack('>BHH', fc, adrs, value)
 
@@ -257,9 +209,9 @@ def handle_request(conn, extended):
                     else:
                         # get the vectors of register values from the data blocks
                         if fc==readInputRegisters:
-                            OK, values = getTableValues(mbd.inputRegblock, adrs, numValues)
+                            OK, values = getTableValues(inputRegblock, adrs, numValues)
                         else:
-                            OK, values = getTableValues(mbd.holdingRegblock, adrs, numValues)
+                            OK, values = getTableValues(holdingRegblock, adrs, numValues)
                         if not OK:
                             pdu = struct.pack('>BB', 0x80+fc, 2)
                         else:
@@ -275,9 +227,9 @@ def handle_request(conn, extended):
                         pdu = struct.pack('>BB', 0x80+fc, 2)
                     else:
                         if fc==writeInputRegisters:
-                            setTableValues(mbd.inputRegblock, adrs, valueVec) 
+                            setTableValues(inputRegblock, adrs, valueVec) 
                         else:
-                            setTableValues(mbd.holdingRegblock, adrs, valueVec) 
+                            setTableValues(holdingRegblock, adrs, valueVec) 
 
                         pdu = struct.pack('>BHH', fc, adrs, numInputs)
 
@@ -287,9 +239,9 @@ def handle_request(conn, extended):
                         pdu = struct.pack('>BB', 0x80+fc, 2)
                     else:
                         if fc==writeInputRegister:
-                            setTableValues(mbd.inputRegblock, adrs, [value])
+                            setTableValues(inputRegblock, adrs, [value])
                         else:
-                            setTableValues(mbd.holdingRegblock, adrs, [value])
+                            setTableValues(holdingRegblock, adrs, [value])
 
                         pdu = struct.pack('>BHH', fc, adrs, value)
                 
@@ -298,13 +250,13 @@ def handle_request(conn, extended):
                     if tablesize <= adrs:
                         pdu = struct.pack('>BB', 0x80+fc, 2)
                     else:
-                        OK, regValue = getTableValues(mbd.holdingRegblock, adrs, 1)
+                        OK, regValue = getTableValues(holdingRegblock, adrs, 1)
                         if not OK:
                             pdu = struct.pack('>BB', 0x80+fc, 2)
                         else:
                             regValue[0] &= andMsk
                             regValue[0] |= orMsk
-                            OK = setTableValues(mbd.holdingRegblock, adrs, regValue)
+                            OK = setTableValues(holdingRegblock, adrs, regValue)
                             if not OK:
                                 pdu = struct.pack('>BB', 0x80+fc, 2)
                             else:
@@ -313,11 +265,11 @@ def handle_request(conn, extended):
                 elif fc == readWriteRegisters:
                     (readAdrs, readNum, writeAdrs, writeNum, writeBytes) = struct.unpack('>HHHHB', pdu_in[:9])
                     writeValues = mbstruct.unpack_values_list(pdu_in[9:])
-                    OK = setTableValues(mbd.holdingRegblock, writeAdrs, writeValues)
+                    OK = setTableValues(holdingRegblock, writeAdrs, writeValues)
                     if not OK:
                         pdu = struct.pack('>BB', 0x80+fc, 4)
                     else: 
-                        OK, values = getTableValues(mbd.holdingRegblock, readAdrs, readNum)
+                        OK, values = getTableValues(holdingRegblock, readAdrs, readNum)
                         if not OK:
                             pdu = struct.pack('>BB', 0x80+fc, 4)
                         else:
@@ -371,45 +323,17 @@ def create_modbus_tcp_packet(transaction_id, unit_id, pdu):
     return mbap_header + pdu
 
 
-def setup_server():
+def setup_server(tablesize, server_host, client_port):
+    global srvr_sock, coilblock, datablock, inputRegblock, holdingRegblock
     """Run server setup."""
 
-    mbd.coilblock     = ModbusSequentialDataBlock(0x00, [0]*tablesize)
-    mbd.datablock     = ModbusSequentialDataBlock(0x00, [0]*tablesize)
-    mbd.inputRegblock = ModbusSequentialDataBlock(0x00, [0]*tablesize)
-    mbd.holdingRegblock = ModbusSequentialDataBlock(0x00, [0]*tablesize)
+    coilblock       = ModbusSequentialDataBlock(0x00, [0]*tablesize)
+    datablock       = ModbusSequentialDataBlock(0x00, [0]*tablesize)
+    inputRegblock   = ModbusSequentialDataBlock(0x00, [0]*tablesize)
+    holdingRegblock = ModbusSequentialDataBlock(0x00, [0]*tablesize)
 
-    # set coil[0] high so that the system runs
-    # mbd.setTableValues(mbd.coilblock, 0, [True])
-
-def main(cmdline):
-    global tablesize, server_host, client_port
-
-    """Combine setup and run."""
-    args = getArgs()
-
-    # set up the asychronous pymodbus server
-    setup_server()
-    
-    # start the Modbus command server and spin up a thread to
-    # handle requests to it
+    # spin up the srvr socket
     srvr_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srvr_sock.bind((server_host, client_port))
-    srvr_thread = threading.Thread(target=srvr_thread_function, args=(srvr_sock,False))
-    srvr_thread.start()
-
-    # spin up the PLC thread
-    plc_thread = threading.Thread(target=plc.plc_thread_function, args=(mpc,))
-    plc_thread.start()
-
-    # spin up the digital twin thread
-    dt_thread = threading.Thread(target=dt.dt_thread_function, args = (mpt,rseed))
-    dt_thread.start()
-
     print(f"listening for client on ({server_host}, {client_port})") 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("run-time arguments needed")
-        exit(1)
-    main(sys.argv[1:])

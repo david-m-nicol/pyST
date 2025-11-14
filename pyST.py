@@ -1428,7 +1428,7 @@ def mem_code_adv(mem_code, inc):
 
 add_st2py  = '\ndef plc_thread_function(spc):\n'
 entry_call = '\nif __name__ == "__main__":\n    st2py()\n'
-imports    = ('sys','os','pdb','json','copy','math','mbd','mbaux','threading','time')
+imports    = ('sys','os','pdb','json','copy','math','mbs','mbaux','threading','time')
 
 def add_imports():
     rtn = []

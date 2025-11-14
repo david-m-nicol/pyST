@@ -31,7 +31,8 @@ This repository contains files in different categories
 
 ###### Example
 
-- mbs.py ,  python file with three threads.  One thread provides a digital twin of an elevator system, another thread executes code presumably converted by pyST.py to create a PLC representation in python, the third is a Modbus server.
+- mbp.py ,  python file with three threads.  One thread provides a digital twin of an elevator system, another thread executes code presumably converted by pyST.py to create a PLC representation in python, the third is a Modbus server.
+- mbs.py, python file with data structures and methods implementing a Modbus server.
 - args , a command line included when running mbs.py ,
 - dt.py , python file with data and methods creating a digital twin of an elevator that is controlled by the PLC
 - plc.py , python file presumeably created by pyST.py from a .st program designed to control the elevator
@@ -403,9 +404,9 @@ The actions of the elevator are pretty much just following the commands that arr
 
 So then the digital twin chooses 'the next' floor to visit and communicates that to the PLC through the IX tables.   The PLC program variables are load with these requests, and at the end of that pass of the control loop all these variables are written into Modbus data tables.  Some time later the Modbus client will read those input tables and notice that it needs to select the next floor from among all the known requests.  It does so, and using Modbus writes a code of the dentity of the chosen floor to the holding registers table.   Now at the top of every pass through the PLC control loop, the holding register to which that coded selection was written is read from the Modbus table, and passes where a selection is newly recognized take that selection and transform it so that the PLC can power the elevator in the proper direction, and drop the power at the proper time to see it glide to a halt at the selected floor.
 
-##### mbs.py
+##### mbp.py
 
-The mbs.py file runs three threads.   One handles the digital twin, one handles the PLC, and the last handles the Modbus server.  At a high level, what one does is to start mbs.py, whereupon the PLC awaits a signal via Modbus to start the system and the digital twin awaits a signal through the QX interface that the system is running before it recognizes any other commands.  The essential command line statements are in file args
+The mbp.py ('modbus_plc') file runs three threads.   One handles the digital twin, one handles the PLC, and the last handles the Modbus server.  At a high level, what one does is to start mbs.py, whereupon the PLC awaits a signal via Modbus to start the system and the digital twin awaits a signal through the QX interface that the system is running before it recognizes any other commands.  The essential command line statements are in file args
 
 ```
 -cport 5020
@@ -418,7 +419,7 @@ Where -cport names the port used to communicate with the Modbus server, -mpc giv
 To start the server, we execute the command below, and see the report that the server is waiting for a connection.
 
 ```
-$ python mbs.py -is args 
+$ python mbp.py -is args 
 listening for client on (127.0.0.1, 5020)
 ```
 
@@ -459,7 +460,7 @@ It reports that it has opened a socket. Until the mbs server (or some other Modb
 So now will stand everything up and give screen grabs of what the processes report.  We include line numbers here for reference.
 
 ```
-  1 $ python mbs.py -cport 5020
+  1 $ python mbp.py -cport 5020
   2 listening for client on (127.0.0.1, 5020)
   3 start moving up from floor 0
   4 power stopped at floor 3

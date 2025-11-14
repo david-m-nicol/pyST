@@ -4,7 +4,7 @@ import pdb
 import json
 import copy
 import math
-import mbd
+import mbs
 import mbaux
 import threading
 import time
@@ -24,19 +24,19 @@ class IMPORT_FROM_MB():
         # data table to import the value from
         match TABLE:
             case 'COIL':
-                input_blk = mbd.coilblock
+                input_blk = mbs.coilblock
             case 'DATA':
-                input_blk = mbd.datablock
+                input_blk = mbs.datablock
             case 'INPUT_REG':
-                input_blk = mbd.inputRegblock
+                input_blk = mbs.inputRegblock
             case 'HOLDING_REG':
-                input_blk = mbd.holdingRegblock
+                input_blk = mbs.holdingRegblock
             case _:
                 print(f"unrecognized Modbus table {TABLE}")
                 return
-        # the file mbd.py has the code and global data structures through which
+        # the file mbs.py has the code and global data structures through which
         # we interact with Modbus
-        OK, values = mbd.getTableValues(input_blk, IDX, LEN)
+        OK, values = mbs.getTableValues(input_blk, IDX, LEN)
         if OK:
             if LEN==1:
                 self.VALUE = values[0] 
@@ -53,20 +53,20 @@ class EXPORT_TO_MB():
     def call(self, VALUE=None, TABLE='COIL', START=0, LEN=1, IDX=4):
         match TABLE:
             case 'COIL':
-                input_blk = mbd.coilblock
+                input_blk = mbs.coilblock
             case 'DATA':
-                input_blk = mbd.datablock
+                input_blk = mbs.datablock
             case 'INPUT_REG':
-                input_blk = mbd.inputRegblock
+                input_blk = mbs.inputRegblock
             case 'HOLDING_REG':
-                input_blk = mbd.holdingRegblock
+                input_blk = mbs.holdingRegblock
             case _:
                 print(f"unrecognized Modbus table {TABLE}")
                 return
         if LEN==1:
-            OK = mbd.setTableValues(input_blk, IDX, [VALUE])
+            OK = mbs.setTableValues(input_blk, IDX, [VALUE])
         else:
-            OK = mbd.setTableValues(input_blk, IDX, VALUE[START:START+LEN])
+            OK = mbs.setTableValues(input_blk, IDX, VALUE[START:START+LEN])
         if not OK:
             print(f"problem exporting value {VALUE} to Modbus table {TABLE}")
 # pyST.py creates a json string that is converted to a dictionary
