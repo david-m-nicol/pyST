@@ -346,6 +346,7 @@ IW_seq = var_seq('IW')
 QX_seq = var_seq('QX')
 QW_seq = var_seq('QW')
 MW_seq = var_seq('MW')
+MX_seq = var_seq('MX')
 MD_seq = var_seq('MD')
 ML_seq = var_seq('ML')
 
@@ -483,12 +484,14 @@ class Variable:
                 QW_seq.add_var(name, var_type, py_type, mem_code, self.value, var_array=var_array, array_len=array_len)
             case 'MW':
                 MW_seq.add_var(name, var_type, py_type, mem_code, self.value, var_array=var_array, array_len=array_len)
+            case 'MX':
+                MX_seq.add_var(name, var_type, py_type, mem_code, self.value, var_array=var_array, array_len=array_len)
             case 'MD':
                 MD_seq.add_var(name, var_type, py_type, mem_code, self.value, var_array=var_array, array_len=array_len)
             case 'ML':
                 ML_seq.add_var(name, var_type, py_type, mem_code, self.value, var_array=var_array, array_len=array_len)
             case _:
-                print(f"unrecognized PLC address {adrs}")
+                print(f"unrecognized PLC address {mem_class}")
                 return  
 
 global_stmnt = ''
@@ -1249,6 +1252,11 @@ def compute_mb_mapping():
         mb_idx += len(subseq.values)
         subseq.mb_last = mb_idx-1
 
+    for subseq in MX_seq.subseq:
+        subseq.mb_first = mb_idx
+        mb_idx += len(subseq.values)
+        subseq.mb_last = mb_idx-1
+        
     # make sure mb_idx is even
     mb_idx += mb_idx%2
     for subseq in MD_seq.subseq:
@@ -1393,7 +1401,10 @@ def build_location_map(output_file):
 
     for subseq in MW_seq.subseq:
         add_loc_desc(subseq, var_inst)
-
+        
+    for subseq in MX_seq.subseq:
+        add_loc_desc(subseq, var_inst)
+        
     for subseq in MD_seq.subseq:
         add_loc_desc(subseq, var_inst)
 
